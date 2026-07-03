@@ -310,18 +310,28 @@ export default function SignUpPage() {
         console.log('[v0] New auth user created:', userId)
       }
 
-      // Create user profile with auth user ID (compulsory)
-      console.log('[v0] Creating user profile with personal details')
-      const user = await userApi.createUser({
-        id: userId,
-        firstname: formData.firstname,
-        lastname: formData.lastname,
-        email: formData.email,
-        phone_number: formData.phone_number,
-        address: formData.address,
-        city: formData.city,
+      // Create user profile via API (bypasses RLS)
+      console.log('[v0] Creating user profile with personal details via API')
+      const userRes = await fetch('/api/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userId,
+          firstname: formData.firstname,
+          lastname: formData.lastname,
+          email: formData.email,
+          phone_number: formData.phone_number,
+          address: formData.address,
+          city: formData.city,
+        }),
       })
 
+      if (!userRes.ok) {
+        const errorData = await userRes.json()
+        throw new Error(errorData.error || 'Failed to create user profile')
+      }
+
+      const user = await userRes.json()
       console.log('[v0] User profile created:', user.id)
 
       // Upload images if provided
@@ -338,17 +348,26 @@ export default function SignUpPage() {
         image2Url = await vendorApi.uploadVendorImage(user.id, 2, formData.image2)
       }
 
-      // Create vendor profile (COMPULSORY)
-      console.log('[v0] Creating vendor profile with business details')
-      await vendorApi.createVendor({
-        user_id: user.id,
-        business_name: formData.business_name,
-        description: formData.description,
-        image1: image1Url,
-        image2: image2Url,
-        have_business_phonenumber: formData.have_business_phonenumber,
-        business_phonenumber: formData.business_phonenumber || null,
+      // Create vendor profile via API (bypasses RLS)
+      console.log('[v0] Creating vendor profile with business details via API')
+      const vendorRes = await fetch('/api/vendors/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          business_name: formData.business_name,
+          description: formData.description,
+          image1: image1Url,
+          image2: image2Url,
+          have_business_phonenumber: formData.have_business_phonenumber,
+          business_phonenumber: formData.business_phonenumber || null,
+        }),
       })
+
+      if (!vendorRes.ok) {
+        const errorData = await vendorRes.json()
+        throw new Error(errorData.error || 'Failed to create vendor profile')
+      }
 
       console.log('[v0] Signup complete - user and vendor profiles created')
       router.push('/dashboard')
