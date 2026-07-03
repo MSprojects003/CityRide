@@ -25,56 +25,29 @@ export function GoogleAuthButton({
   const handleGoogleAuth = async () => {
     try {
       setLoading(true)
+      console.log('[v0] Starting Google OAuth flow')
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       })
 
-      if (error) throw error
-
-      // Check if this is a new user
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (authUser) {
-        const existingUser = await userApi.getUserByEmail(authUser.email!)
-
-        if (!existingUser) {
-          // New user - extract name from Google profile
-          const fullName = authUser.user_metadata?.full_name || ''
-          const [firstname, ...lastnameParts] = fullName.split(' ')
-          const lastname = lastnameParts.join(' ') || ''
-
-          if (onSuccess) {
-            await onSuccess({
-              email: authUser.email!,
-              firstname: firstname || '',
-              lastname: lastname || '',
-            })
-          } else {
-            // Redirect to signup with pre-filled data
-            sessionStorage.setItem(
-              'googleAuthData',
-              JSON.stringify({
-                email: authUser.email!,
-                firstname: firstname || '',
-                lastname: lastname || '',
-              })
-            )
-            router.push('/auth/signup')
-          }
-        } else {
-          // Existing user - redirect to dashboard
-          router.push('/dashboard')
-        }
+      if (error) {
+        console.error('[v0] OAuth error:', error)
+        throw error
       }
+
+      console.log('[v0] OAuth redirect initiated')
     } catch (error) {
-      console.error('Google auth error:', error)
-      throw error
+      const errorMessage = error instanceof Error ? error.message : 'Google sign in failed'
+      console.error('[v0] Google auth error:', errorMessage, error)
+      alert(`Error: ${errorMessage}`)
     } finally {
       setLoading(false)
     }

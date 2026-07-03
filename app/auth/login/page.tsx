@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/providers/auth-provider'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const { signInWithEmail } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Check for OAuth errors in URL
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam))
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,10 +32,20 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      await signInWithEmail(email, password)
+      console.log('[v0] Attempting email login with:', email)
+      const result = await signInWithEmail(email, password)
+      
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+
+      console.log('[v0] Login successful, redirecting to dashboard')
       router.push('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      const errorMessage = err instanceof Error ? err.message : 'Login failed'
+      console.error('[v0] Login error:', errorMessage)
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }

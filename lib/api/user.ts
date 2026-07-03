@@ -20,6 +20,7 @@ export const userApi = {
 
   // Create user with personal details
   async createUser(userData: {
+    id?: string
     firstname: string
     lastname: string
     email: string
@@ -31,6 +32,7 @@ export const userApi = {
       .from('users')
       .insert([
         {
+          ...(userData.id && { id: userData.id }),
           firstname: userData.firstname,
           lastname: userData.lastname,
           email: userData.email,
@@ -45,7 +47,10 @@ export const userApi = {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[v0] User creation error:', error)
+      throw error
+    }
     return data
   },
 

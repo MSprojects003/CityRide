@@ -252,12 +252,30 @@ export default function SignUpPage() {
 
     try {
       setLoading(true)
+      console.log('[v0] Starting signup with email and password')
 
       // Sign up with email and password
-      await signUpWithEmail(formData.email, formData.password)
+      const signUpResult = await signUpWithEmail(formData.email, formData.password)
+      if (signUpResult.error) {
+        console.error('[v0] Auth signup error:', signUpResult.error)
+        setError(signUpResult.error)
+        return
+      }
 
-      // Create user profile
+      console.log('[v0] Auth signup successful, now creating user profile')
+
+      // Get the authenticated user
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+
+      if (!authUser) {
+        throw new Error('Authentication failed. Please try again.')
+      }
+
+      // Create user profile with auth user ID
       const user = await userApi.createUser({
+        id: authUser.id,
         firstname: formData.firstname,
         lastname: formData.lastname,
         email: formData.email,
@@ -265,6 +283,8 @@ export default function SignUpPage() {
         address: formData.address,
         city: formData.city,
       })
+
+      console.log('[v0] User profile created:', user.id)
 
       // Upload images if provided
       let image1Url: string | null = null
@@ -289,9 +309,12 @@ export default function SignUpPage() {
         business_phonenumber: formData.business_phonenumber || null,
       })
 
+      console.log('[v0] Vendor profile created, redirecting to dashboard')
       router.push('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed')
+      const errorMessage = err instanceof Error ? err.message : 'Sign up failed'
+      console.error('[v0] Signup error:', errorMessage, err)
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
