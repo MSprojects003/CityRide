@@ -1,13 +1,8 @@
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { SidebarInset } from "@/components/ui/sidebar"
-import AppSidebar from "@/components/custom/AppSidebar"
-import PageHeader from "@/components/custom/PageHeader"
+'use client'
 
-const mockUser = {
-  name: "John Driver",
-  email: "john@cityride.com",
-  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john"
-}
+import { SidebarInset } from "@/components/ui/sidebar"
+import PageHeader from "@/components/custom/PageHeader"
+import { DashboardLayoutClient } from "./layout-client"
 
 export default function DashboardLayout({
   children,
@@ -15,14 +10,13 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
-      <AppSidebar user={mockUser} />
+    <DashboardLayoutClient>
       <SidebarInset className="flex flex-col">
         <PageHeader />
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </SidebarInset>
-    </SidebarProvider>
+    </DashboardLayoutClient>
   )
 }
