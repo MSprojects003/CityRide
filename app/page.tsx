@@ -1,6 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { SidebarInset } from "@/components/ui/sidebar"
 import AppSidebar from "@/components/custom/AppSidebar"
+import PageHeader from "@/components/custom/PageHeader"
 import { Button } from "@/components/ui/button"
 
 export default function Page() {
@@ -15,10 +16,10 @@ export default function Page() {
     <SidebarProvider>
       <AppSidebar user={mockUser} />
       <SidebarInset className="flex flex-col">
+        <PageHeader />
         <main className="flex-1 p-6">
           <div className="flex max-w-2xl flex-col gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Welcome to CityRide</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 Manage your rides, vehicles, and customer reservations from here.
               </p>
