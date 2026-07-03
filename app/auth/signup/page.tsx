@@ -104,9 +104,9 @@ export default function SignUpPage() {
           lastname: data.lastname,
         }))
 
-        // If skipTab1 flag is set, activate Tab 2 directly
-        if (data.skipTab1) {
-          console.log('[v0] Skipping Tab 1, showing Tab 2 for vendor details')
+        // If Google auth or skipTab1 flag is set, activate Tab 2 directly
+        if (data.isGoogleAuth || data.skipTab1) {
+          console.log('[v0] Google auth detected or skipTab1 flag, showing Tab 2 for vendor details')
           setActiveTab('business')
         }
       } catch (e) {
@@ -127,8 +127,8 @@ export default function SignUpPage() {
         lastname: data.lastname,
       }))
 
-      if (data.skipTab1) {
-        console.log('[v0] Skipping Tab 1, showing Tab 2 for vendor details')
+      if (data.isGoogleAuth || data.skipTab1) {
+        console.log('[v0] Google auth or skipTab1 flag detected, showing Tab 2 for vendor details')
         setActiveTab('business')
       }
 

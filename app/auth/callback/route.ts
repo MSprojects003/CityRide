@@ -41,67 +41,75 @@ export async function GET(request: NextRequest) {
       const authUserId = session?.user?.id
       const authEmail = session?.user?.email
       
-      console.log('[v0] Auth provider:', provider, 'User ID:', authUserId)
+      console.log('[v0] Auth successful:', { provider, authUserId, authEmail })
 
-      // Check if user exists in database
-      if (authUserId) {
-        try {
-          const checkRes = await fetch(
-            new URL('/api/users/check-exists', request.url).toString(),
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: authUserId, email: authEmail }),
-            }
-          )
-
-          const checkData = await checkRes.json()
-          console.log('[v0] User existence check result:', checkData.exists)
-
-          if (checkData.exists) {
-            // User exists in database, proceed to dashboard
-            console.log('[v0] User found in database, redirecting to dashboard')
-            return NextResponse.redirect(new URL('/dashboard', request.url))
-          } else {
-            // User doesn't exist in database
-            console.log('[v0] User not found in database, redirecting to signup')
-
-            if (provider === 'google') {
-              // For Google OAuth, extract name from user metadata
-              const fullName = session?.user?.user_metadata?.full_name || ''
-              const [firstname, ...lastnameParts] = fullName.split(' ')
-              const lastname = lastnameParts.join(' ') || ''
-
-              // Store Google auth data
-              const authData = {
-                email: authEmail,
-                firstname: firstname || '',
-                lastname: lastname || '',
-                skipTab1: true,
-              }
-
-              // Redirect to signup with Tab 2 and auth data
-              const signupUrl = new URL('/auth/signup', request.url)
-              signupUrl.searchParams.set('tab', 'business')
-              signupUrl.searchParams.set(
-                'authData',
-                encodeURIComponent(JSON.stringify(authData))
-              )
-              return NextResponse.redirect(signupUrl)
-            } else {
-              // For email signup, redirect to Tab 1
-              return NextResponse.redirect(new URL('/auth/signup', request.url))
-            }
-          }
-        } catch (checkError) {
-          console.error('[v0] Error checking user existence:', checkError)
-          // On error, redirect to signup to be safe
-          return NextResponse.redirect(new URL('/auth/signup', request.url))
-        }
+      if (!authUserId) {
+        console.error('[v0] No user ID in session')
+        return NextResponse.redirect(new URL('/auth/login?error=no_user_id', request.url))
       }
 
-      console.log('[v0] No user ID found, redirecting to login')
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      // Check if user exists in database using service role
+      try {
+        console.log('[v0] Checking if user exists in database...')
+        
+        const checkRes = await fetch(
+          new URL('/api/users/check-exists', request.url).toString(),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: authUserId, email: authEmail }),
+          }
+        )
+
+        const checkData = await checkRes.json()
+        console.log('[v0] User check response:', { exists: checkData.exists, error: checkData.error })
+
+        if (checkData.error) {
+          console.error('[v0] Error checking user:', checkData.error)
+          throw new Error(checkData.error)
+        }
+
+        if (checkData.exists) {
+          // User exists in database, proceed to dashboard
+          console.log('[v0] User exists in database, redirecting to dashboard')
+          return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
+
+        // User doesn't exist - must complete signup
+        console.log('[v0] User not in database, must complete signup')
+
+        if (provider === 'google') {
+          // Extract name from Google profile
+          const fullName = session?.user?.user_metadata?.full_name || ''
+          const [firstname, ...lastnameParts] = fullName.split(' ')
+          const lastname = lastnameParts.join(' ') || ''
+
+          const authData = {
+            email: authEmail,
+            firstname: firstname || '',
+            lastname: lastname || '',
+            isGoogleAuth: true,
+          }
+
+          console.log('[v0] Google user, redirecting to signup Tab 2 with pre-filled data')
+
+          const signupUrl = new URL('/auth/signup', request.url)
+          signupUrl.searchParams.set('tab', 'business')
+          signupUrl.searchParams.set(
+            'authData',
+            encodeURIComponent(JSON.stringify(authData))
+          )
+          return NextResponse.redirect(signupUrl)
+        } else {
+          // Email signup - redirect to Tab 1
+          console.log('[v0] Email signup, redirecting to signup Tab 1')
+          return NextResponse.redirect(new URL('/auth/signup', request.url))
+        }
+      } catch (checkError) {
+        console.error('[v0] User check failed:', checkError)
+        // Default to signup if check fails
+        return NextResponse.redirect(new URL('/auth/signup', request.url))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authentication failed'
       console.error('[v0] Callback exception:', message)
