@@ -86,11 +86,12 @@ export default function SignUpPage() {
     image2: null,
   })
 
-  // Check for pre-filled Google data
+  // Check for pre-filled Google data and handle URL params
   useEffect(() => {
     const stored = sessionStorage.getItem('googleAuthData')
     if (stored) {
       const data = JSON.parse(stored)
+      console.log('[v0] Google auth data found:', data)
       setGoogleAuthData(data)
       setFormData((prev) => ({
         ...prev,
@@ -98,7 +99,21 @@ export default function SignUpPage() {
         firstname: data.firstname,
         lastname: data.lastname,
       }))
+
+      // If skipTab1 flag is set, activate Tab 2 directly
+      if (data.skipTab1) {
+        console.log('[v0] Skipping Tab 1, showing Tab 2 for vendor details')
+        setActiveTab('business')
+      }
+
       sessionStorage.removeItem('googleAuthData')
+    }
+
+    // Check URL params for tab
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab === 'business') {
+      setActiveTab('business')
     }
   }, [])
 
@@ -139,6 +154,11 @@ export default function SignUpPage() {
   }
 
   const validatePersonalDetails = (): boolean => {
+    // Skip validation if Google user (no password needed for OAuth)
+    if (googleAuthData) {
+      return true
+    }
+
     if (
       !formData.firstname.trim() ||
       !formData.lastname.trim() ||
@@ -252,30 +272,48 @@ export default function SignUpPage() {
 
     try {
       setLoading(true)
-      console.log('[v0] Starting signup with email and password')
 
-      // Sign up with email and password
-      const signUpResult = await signUpWithEmail(formData.email, formData.password)
-      if (signUpResult.error) {
-        console.error('[v0] Auth signup error:', signUpResult.error)
-        setError(signUpResult.error)
-        return
+      let userId: string | undefined
+
+      // If this is a Google OAuth user
+      if (googleAuthData) {
+        console.log('[v0] Google OAuth signup - getting authenticated user ID')
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+
+        if (!authUser) {
+          throw new Error('Authentication failed. Please try again.')
+        }
+
+        userId = authUser.id
+        console.log('[v0] Auth user ID:', userId)
+      } else {
+        // For email signup, sign up first
+        console.log('[v0] Email signup - creating auth account')
+        const signUpResult = await signUpWithEmail(formData.email, formData.password)
+        if (signUpResult.error) {
+          console.error('[v0] Auth signup error:', signUpResult.error)
+          setError(signUpResult.error)
+          return
+        }
+
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+
+        if (!authUser) {
+          throw new Error('Authentication failed. Please try again.')
+        }
+
+        userId = authUser.id
+        console.log('[v0] New auth user created:', userId)
       }
 
-      console.log('[v0] Auth signup successful, now creating user profile')
-
-      // Get the authenticated user
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-
-      if (!authUser) {
-        throw new Error('Authentication failed. Please try again.')
-      }
-
-      // Create user profile with auth user ID
+      // Create user profile with auth user ID (compulsory)
+      console.log('[v0] Creating user profile with personal details')
       const user = await userApi.createUser({
-        id: authUser.id,
+        id: userId,
         firstname: formData.firstname,
         lastname: formData.lastname,
         email: formData.email,
@@ -291,14 +329,17 @@ export default function SignUpPage() {
       let image2Url: string | null = null
 
       if (formData.image1) {
+        console.log('[v0] Uploading image 1')
         image1Url = await vendorApi.uploadVendorImage(user.id, 1, formData.image1)
       }
 
       if (formData.image2) {
+        console.log('[v0] Uploading image 2')
         image2Url = await vendorApi.uploadVendorImage(user.id, 2, formData.image2)
       }
 
-      // Create vendor profile
+      // Create vendor profile (COMPULSORY)
+      console.log('[v0] Creating vendor profile with business details')
       await vendorApi.createVendor({
         user_id: user.id,
         business_name: formData.business_name,
@@ -309,7 +350,7 @@ export default function SignUpPage() {
         business_phonenumber: formData.business_phonenumber || null,
       })
 
-      console.log('[v0] Vendor profile created, redirecting to dashboard')
+      console.log('[v0] Signup complete - user and vendor profiles created')
       router.push('/dashboard')
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign up failed'

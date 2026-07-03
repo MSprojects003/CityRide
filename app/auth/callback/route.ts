@@ -33,7 +33,20 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      console.log('[v0] Session exchanged successfully, redirecting to dashboard')
+      console.log('[v0] Session exchanged successfully, checking provider')
+      
+      // Get current session to check provider
+      const { data: { session } } = await supabase.auth.getSession()
+      const provider = session?.user?.app_metadata?.provider
+      
+      console.log('[v0] Auth provider:', provider)
+
+      if (provider === 'google') {
+        console.log('[v0] Google OAuth detected, checking if user exists in database')
+        return NextResponse.redirect(new URL('/auth/google-callback', request.url))
+      }
+
+      console.log('[v0] Email signup, redirecting to dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authentication failed'
