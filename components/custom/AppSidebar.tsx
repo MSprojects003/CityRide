@@ -3,7 +3,7 @@
 import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { LogOut, Home, Users, Calendar, Car } from 'lucide-react'
+import { Home, Users, Calendar, Car } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -13,8 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import NavUser from '@/components/custom/NavUser'
 
 interface SidebarUser {
   name: string
@@ -24,9 +23,10 @@ interface SidebarUser {
 
 interface AppSidebarProps {
   user?: SidebarUser
+  onLogout?: () => void
 }
 
-export default function AppSidebar({ user }: AppSidebarProps) {
+export default function AppSidebar({ user, onLogout }: AppSidebarProps) {
   const navItems = [
     {
       label: 'Home',
@@ -93,53 +93,10 @@ export default function AppSidebar({ user }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarContent>
 
-      {/* Profile Card & Footer */}
+      {/* Profile Dropdown Footer */}
       <SidebarFooter className="border-t border-sidebar-border pt-4">
         {user ? (
-          <div className="space-y-3">
-            {/* Profile Card */}
-            <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent p-2">
-              <Image
-                src={user.avatar}
-                alt={user.name}
-                width={36}
-                height={36}
-                className="h-9 w-9 rounded-lg object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-sidebar-accent-foreground">
-                  {user.name}
-                </p>
-                <p className="truncate text-xs text-sidebar-accent-foreground/70">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <Separator className="my-1" />
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                  <span className="text-xs">Account Settings</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                  <span className="text-xs">Help & Support</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-
-            <Separator className="my-1" />
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2 text-xs text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Log out
-            </Button>
-          </div>
+          <NavUser user={user} onLogout={onLogout} />
         ) : (
           <div className="text-center text-xs text-sidebar-foreground/60">
             Sign in to see your profile
