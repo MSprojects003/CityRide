@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import NavUser from '@/components/custom/NavUser'
+import logo from "@/public/assets/logo/cityride.png"
 
 interface SidebarUser {
   name: string
@@ -53,23 +54,20 @@ export default function AppSidebar({ user, onLogout }: AppSidebarProps) {
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
       {/* Logo Section */}
-      <SidebarHeader className="border-b border-sidebar-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Image
-              src="/cityride-logo.png"
-              alt="CityRide Logo"
-              width={40}
-              height={40}
-              className="rounded-lg"
-            />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sidebar-foreground">CityRide</span>
-            <span className="text-xs text-sidebar-foreground/60">Platform</span>
-          </div>
-        </div>
-      </SidebarHeader>
+      <SidebarHeader className="border-b border-sidebar-border px-0 py-0"> 
+  <div className="flex items-center justify-center">
+    <div className="h-20 w-30 flex items-center justify-center">
+      <Image
+        src={logo}
+        alt="CityRide Logo"
+        width={130}
+        height={130}
+        className="object-contain"
+        priority
+      />
+    </div>
+  </div>
+</SidebarHeader>
 
       {/* Navigation Menu */}
       <SidebarContent>
