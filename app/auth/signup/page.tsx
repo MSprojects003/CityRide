@@ -88,10 +88,37 @@ export default function SignUpPage() {
 
   // Check for pre-filled Google data and handle URL params
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+
+    // Check URL for auth data (from callback)
+    const authDataParam = params.get('authData')
+    if (authDataParam) {
+      try {
+        const data = JSON.parse(decodeURIComponent(authDataParam))
+        console.log('[v0] Auth data from callback found:', data)
+        setGoogleAuthData(data)
+        setFormData((prev) => ({
+          ...prev,
+          email: data.email,
+          firstname: data.firstname,
+          lastname: data.lastname,
+        }))
+
+        // If skipTab1 flag is set, activate Tab 2 directly
+        if (data.skipTab1) {
+          console.log('[v0] Skipping Tab 1, showing Tab 2 for vendor details')
+          setActiveTab('business')
+        }
+      } catch (e) {
+        console.error('[v0] Failed to parse auth data:', e)
+      }
+    }
+
+    // Also check sessionStorage for backward compatibility
     const stored = sessionStorage.getItem('googleAuthData')
-    if (stored) {
+    if (stored && !authDataParam) {
       const data = JSON.parse(stored)
-      console.log('[v0] Google auth data found:', data)
+      console.log('[v0] Google auth data found in storage:', data)
       setGoogleAuthData(data)
       setFormData((prev) => ({
         ...prev,
@@ -100,7 +127,6 @@ export default function SignUpPage() {
         lastname: data.lastname,
       }))
 
-      // If skipTab1 flag is set, activate Tab 2 directly
       if (data.skipTab1) {
         console.log('[v0] Skipping Tab 1, showing Tab 2 for vendor details')
         setActiveTab('business')
@@ -109,8 +135,7 @@ export default function SignUpPage() {
       sessionStorage.removeItem('googleAuthData')
     }
 
-    // Check URL params for tab
-    const params = new URLSearchParams(window.location.search)
+    // Check URL params for tab override
     const tab = params.get('tab')
     if (tab === 'business') {
       setActiveTab('business')
