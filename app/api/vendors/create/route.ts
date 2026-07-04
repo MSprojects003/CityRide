@@ -1,4 +1,4 @@
-import { supabaseServer } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -16,28 +16,26 @@ export async function POST(request: NextRequest) {
 
     console.log('[v0] Creating vendor via API:', { user_id, business_name })
 
-    if (!user_id || !business_name) {
+    if (!user_id || !business_name || !description) {
       return NextResponse.json(
-        { error: 'Missing required fields: user_id, business_name' },
+        { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Use service role to bypass RLS
-    const { data, error } = await supabaseServer
+    const supabaseService = createServiceRoleClient()
+
+    const { data, error } = await supabaseService
       .from('vendors')
       .insert([
         {
           user_id,
           business_name,
-          description: description || null,
+          description,
           image1: image1 || null,
           image2: image2 || null,
           have_business_phonenumber: have_business_phonenumber || false,
           business_phonenumber: business_phonenumber || null,
-          is_nic_applied: false,
-          is_vo_certificate_submitted: false,
-          is_active: false,
         },
       ])
       .select()
@@ -49,6 +47,17 @@ export async function POST(request: NextRequest) {
         { error: error.message },
         { status: 400 }
       )
+    }
+
+    // Mark the user as a vendor now that their vendor profile exists
+    const { error: updateError } = await supabaseService
+      .from('users')
+      .update({ is_vendor: true })
+      .eq('id', user_id)
+
+    if (updateError) {
+      console.error('[v0] Failed to flag user as vendor:', updateError)
+      // Not fatal — vendor row exists, just log it
     }
 
     console.log('[v0] Vendor created successfully:', data.id)

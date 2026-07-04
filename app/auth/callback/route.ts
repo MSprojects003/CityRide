@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -9,7 +9,6 @@ export async function GET(request: NextRequest) {
 
   console.log('[v0] Auth callback received:', { code: !!code, error, error_description })
 
-  // Handle OAuth errors
   if (error) {
     console.error('[v0] OAuth error:', error_description || error)
     return NextResponse.redirect(
@@ -17,108 +16,79 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  if (code) {
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-
-      if (exchangeError) {
-        console.error('[v0] Session exchange error:', exchangeError)
-        return NextResponse.redirect(
-          new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, request.url)
-        )
-      }
-
-      console.log('[v0] Session exchanged successfully, checking user status')
-      
-      // Get current session to check provider and user
-      const { data: { session } } = await supabase.auth.getSession()
-      const provider = session?.user?.app_metadata?.provider
-      const authUserId = session?.user?.id
-      const authEmail = session?.user?.email
-      
-      console.log('[v0] Auth successful:', { provider, authUserId, authEmail })
-
-      if (!authUserId) {
-        console.error('[v0] No user ID in session')
-        return NextResponse.redirect(new URL('/auth/login?error=no_user_id', request.url))
-      }
-
-      // Check if user exists in database using service role
-      try {
-        console.log('[v0] Checking if user exists in database...')
-        
-        const checkRes = await fetch(
-          new URL('/api/users/check-exists', request.url).toString(),
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: authUserId, email: authEmail }),
-          }
-        )
-
-        const checkData = await checkRes.json()
-        console.log('[v0] User check response:', { exists: checkData.exists, error: checkData.error })
-
-        if (checkData.error) {
-          console.error('[v0] Error checking user:', checkData.error)
-          throw new Error(checkData.error)
-        }
-
-        if (checkData.exists) {
-          // User exists in database, proceed to dashboard
-          console.log('[v0] User exists in database, redirecting to dashboard')
-          return NextResponse.redirect(new URL('/dashboard', request.url))
-        }
-
-        // User doesn't exist - must complete signup
-        console.log('[v0] User not in database, must complete signup')
-
-        if (provider === 'google') {
-          // Extract name from Google profile
-          const fullName = session?.user?.user_metadata?.full_name || ''
-          const [firstname, ...lastnameParts] = fullName.split(' ')
-          const lastname = lastnameParts.join(' ') || ''
-
-          const authData = {
-            email: authEmail,
-            firstname: firstname || '',
-            lastname: lastname || '',
-            isGoogleAuth: true,
-          }
-
-          console.log('[v0] Google user, redirecting to signup Tab 2 with pre-filled data')
-
-          const signupUrl = new URL('/auth/signup', request.url)
-          signupUrl.searchParams.set('tab', 'business')
-          signupUrl.searchParams.set(
-            'authData',
-            encodeURIComponent(JSON.stringify(authData))
-          )
-          return NextResponse.redirect(signupUrl)
-        } else {
-          // Email signup - redirect to Tab 1
-          console.log('[v0] Email signup, redirecting to signup Tab 1')
-          return NextResponse.redirect(new URL('/auth/signup', request.url))
-        }
-      } catch (checkError) {
-        console.error('[v0] User check failed:', checkError)
-        // Default to signup if check fails
-        return NextResponse.redirect(new URL('/auth/signup', request.url))
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Authentication failed'
-      console.error('[v0] Callback exception:', message)
-      return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(message)}`, request.url)
-      )
-    }
+  if (!code) {
+    console.warn('[v0] No code in callback, redirecting to login')
+    return NextResponse.redirect(new URL('/auth/login?error=no_code', request.url))
   }
 
-  console.warn('[v0] No code in callback, redirecting to login')
-  return NextResponse.redirect(new URL('/auth/login?error=no_code', request.url))
+  try {
+    const supabase = await createServerSupabaseClient()
+
+    const { data: exchangeData, error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(code)
+
+    if (exchangeError) {
+      console.error('[v0] Session exchange error:', exchangeError.message)
+      return NextResponse.redirect(
+        new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, request.url)
+      )
+    }
+
+    const authUser = exchangeData.user
+    const provider = authUser?.app_metadata?.provider
+    const authUserId = authUser?.id
+    const authEmail = authUser?.email
+
+    console.log('[v0] Auth successful:', { provider, authUserId, authEmail })
+
+    if (!authUserId) {
+      console.error('[v0] No user ID in session')
+      return NextResponse.redirect(new URL('/auth/login?error=no_user_id', request.url))
+    }
+
+    // Check directly against the users table (RLS should allow a user to read their own row)
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', authUserId)
+      .maybeSingle()
+
+    if (lookupError) {
+      console.error('[v0] Error checking user:', lookupError.message)
+      return NextResponse.redirect(new URL('/auth/signup', request.url))
+    }
+
+    if (existingUser) {
+      console.log('[v0] User exists in database, redirecting to dashboard')
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    console.log('[v0] User not in database, must complete signup')
+
+    if (provider === 'google') {
+      const fullName =
+        authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || ''
+      const [firstname, ...lastnameParts] = fullName.split(' ')
+      const lastname = lastnameParts.join(' ') || ''
+
+      const authData = {
+        email: authEmail,
+        firstname: firstname || '',
+        lastname: lastname || '',
+        isGoogleAuth: true,
+      }
+
+      const signupUrl = new URL('/auth/signup', request.url)
+      signupUrl.searchParams.set('tab', 'business')
+      signupUrl.searchParams.set('authData', encodeURIComponent(JSON.stringify(authData)))
+      return NextResponse.redirect(signupUrl)
+    }
+
+    console.log('[v0] Email signup, redirecting to signup Tab 1')
+    return NextResponse.redirect(new URL('/auth/signup', request.url))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Authentication failed'
+    console.error('[v0] Callback exception:', message)
+    return NextResponse.redirect(new URL(`/auth/login?error=${encodeURIComponent(message)}`, request.url))
+  }
 }

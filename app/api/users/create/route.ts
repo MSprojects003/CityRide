@@ -1,4 +1,4 @@
-import { supabaseServer } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -15,8 +15,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use service role to bypass RLS
-    const { data, error } = await supabaseServer
+    const supabaseService = createServiceRoleClient()
+
+    const { data, error } = await supabaseService
       .from('users')
       .insert([
         {

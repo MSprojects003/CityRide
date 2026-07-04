@@ -212,6 +212,15 @@ export default function SignUpPage() {
   }
 
   const validateBusinessDetails = (): boolean => {
+    // Google users skip Tab 1, so their phone/address/city must be
+    // validated here on the Business tab instead.
+    if (googleAuthData) {
+      if (!formData.phone_number.trim() || !formData.address.trim() || !formData.city) {
+        setError('Please complete your personal details')
+        return false
+      }
+    }
+
     if (!formData.business_name.trim() || !formData.description.trim()) {
       setError('Please fill in business name and description')
       return false
@@ -238,52 +247,6 @@ export default function SignUpPage() {
 
     if (validatePersonalDetails()) {
       setActiveTab('business')
-    }
-  }
-
-  const handleGoogleSignUp = async (userData?: {
-    email: string
-    firstname: string
-    lastname: string
-  }) => {
-    if (!userData) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Create user profile
-      const user = await userApi.createUser({
-        firstname: userData.firstname,
-        lastname: userData.lastname,
-        email: userData.email,
-        phone_number: formData.phone_number,
-        address: formData.address,
-        city: formData.city,
-      })
-
-      // Create vendor profile
-      await vendorApi.createVendor({
-        user_id: user.id,
-        business_name: formData.business_name,
-        description: formData.description,
-        have_business_phonenumber: formData.have_business_phonenumber,
-        business_phonenumber: formData.business_phonenumber || null,
-      })
-
-      // Now authenticate with Google
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) throw error
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -547,21 +510,7 @@ export default function SignUpPage() {
                 </div>
               </div>
 
-              <GoogleAuthButton
-                onSuccess={async (userData) => {
-                  if (userData) {
-                    setGoogleAuthData(userData)
-                    setFormData((prev) => ({
-                      ...prev,
-                      email: userData.email,
-                      firstname: userData.firstname,
-                      lastname: userData.lastname,
-                    }))
-                    setActiveTab('business')
-                  }
-                }}
-                isLoading={loading}
-              />
+              <GoogleAuthButton isLoading={loading} />
 
               <p className="text-center text-sm">
                 Already have an account?{' '}
@@ -573,6 +522,58 @@ export default function SignUpPage() {
 
             <TabsContent value="business" className="space-y-4">
               <form onSubmit={handleSubmit} className="space-y-4">
+                {googleAuthData && (
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Complete your personal details
+                    </p>
+                    <div className="space-y-2">
+                      <label htmlFor="phone_number_g" className="text-sm font-medium">
+                        Phone Number
+                      </label>
+                      <Input
+                        id="phone_number_g"
+                        name="phone_number"
+                        type="tel"
+                        placeholder="+94 71 234 5678"
+                        value={formData.phone_number}
+                        onChange={handlePersonalDetailsChange}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label htmlFor="address_g" className="text-sm font-medium">
+                          Address
+                        </label>
+                        <Input
+                          id="address_g"
+                          name="address"
+                          placeholder="123 Main St"
+                          value={formData.address}
+                          onChange={handlePersonalDetailsChange}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="city_g" className="text-sm font-medium">
+                          City
+                        </label>
+                        <Select value={formData.city} onValueChange={handleCityChange}>
+                          <SelectTrigger id="city_g">
+                            <SelectValue placeholder="Select city" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SRI_LANKAN_CITIES.map((city) => (
+                              <SelectItem key={city} value={city}>
+                                {city}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label htmlFor="business_name" className="text-sm font-medium">
                     Business Name
