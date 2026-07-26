@@ -1,85 +1,136 @@
+'use client'
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Car } from "lucide-react"
+import { 
+  Car, 
+  CheckCircle2,
+  Clock,
+  Wrench,
+  AlertCircle
+} from "lucide-react"
+import { CarList } from "@/components/custom/vehicle/List"
+import { Badge } from "@/components/ui/badge"
+import { AddVehicle } from "@/components/custom/vehicle/Add"
+import { useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
+import { vendorApi } from "@/lib/api/vendor"
 
 export default function VehiclesPage() {
-  const vehicles = [
-    { id: 1, name: "Toyota Prius", plate: "ABC123", status: "Available", year: 2022 },
-    { id: 2, name: "Honda Civic", plate: "XYZ789", status: "In Use", year: 2021 },
-    { id: 3, name: "Tesla Model 3", plate: "TES456", status: "Available", year: 2023 },
-    { id: 4, name: "Ford Focus", plate: "FOR999", status: "Maintenance", year: 2020 },
-  ]
+  const [vendorId, setVendorId] = useState<string | null>(null)
+  const [stats, setStats] = useState({ total: 0, available: 0, inUse: 0, maintenance: 0 })
+  const [loading, setLoading] = useState(true)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Available":
-        return "bg-green-100 text-green-800"
-      case "In Use":
-        return "bg-blue-100 text-blue-800"
-      case "Maintenance":
-        return "bg-orange-100 text-orange-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  // Get vendor ID
+  useEffect(() => {
+    const fetchVendor = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const vendor = await vendorApi.getVendorByUserId(user.id)
+          if (vendor) {
+            setVendorId(vendor.id)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching vendor:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchVendor()
+  }, [])
+
+  // Fetch stats
+  useEffect(() => {
+    if (vendorId) {
+      fetchStats()
+    }
+  }, [vendorId])
+
+  const fetchStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('status, availability')
+        .eq('vendor_id', vendorId)
+        .eq('is_deleted', false)
+
+      if (error) throw error
+
+      const total = data?.length || 0
+      const available = data?.filter(v => v.availability === true).length || 0
+      const inUse = data?.filter(v => v.availability === false && v.status === 'active').length || 0
+      const maintenance = data?.filter(v => v.status === 'maintenance').length || 0
+
+      setStats({ total, available, inUse, maintenance })
+    } catch (error) {
+      console.error('Error fetching stats:', error)
     }
   }
 
+  // Handle car actions
+  const handleViewDetails = (carId: string) => {
+    console.log("View details for car:", carId)
+  }
+
+  const handleBookNow = (carId: string) => {
+    console.log("Book car:", carId)
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Manage your vehicle fleet and their status.
-        </p>
-        <Button>Add Vehicle</Button>
-      </div>
-      
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Total Vehicles</p>
-          <p className="mt-2 text-3xl font-bold">4</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Available</p>
-          <p className="mt-2 text-3xl font-bold text-green-600">2</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">In Use</p>
-          <p className="mt-2 text-3xl font-bold text-blue-600">1</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Maintenance</p>
-          <p className="mt-2 text-3xl font-bold text-orange-600">1</p>
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Vehicle Fleet</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage your vehicle fleet and their status.
+          </p>
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-4 py-3 text-left text-sm font-semibold">Vehicle Name</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Plate</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Year</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vehicles.map((vehicle) => (
-              <tr key={vehicle.id} className="border-b border-border hover:bg-muted/50">
-                <td className="px-4 py-3 text-sm">{vehicle.name}</td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{vehicle.plate}</td>
-                <td className="px-4 py-3 text-sm">{vehicle.year}</td>
-                <td className="px-4 py-3 text-sm">
-                  <span className={`rounded px-2 py-1 text-xs font-medium ${getStatusColor(vehicle.status)}`}>
-                    {vehicle.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  <Button variant="ghost" size="sm">Edit</Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="rounded-lg border border-border bg-card p-4 hover:shadow-md transition-shadow">
+          <p className="text-sm text-muted-foreground flex items-center gap-2">
+            <Car className="w-4 h-4" />
+            Total Vehicles
+          </p>
+          <p className="mt-2 text-2xl font-bold">{stats.total}</p>
+        </div>
+        <div className="rounded-lg border border-green-200 bg-green-50/50 p-4 hover:shadow-md transition-shadow">
+          <p className="text-sm text-green-700 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            Available
+          </p>
+          <p className="mt-2 text-2xl font-bold text-green-700">{stats.available}</p>
+        </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 hover:shadow-md transition-shadow">
+          <p className="text-sm text-blue-700 flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            In Use
+          </p>
+          <p className="mt-2 text-2xl font-bold text-blue-700">{stats.inUse}</p>
+        </div>
+        <div className="rounded-lg border border-orange-200 bg-orange-50/50 p-4 hover:shadow-md transition-shadow">
+          <p className="text-sm text-orange-700 flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            Maintenance
+          </p>
+          <p className="mt-2 text-2xl font-bold text-orange-700">{stats.maintenance}</p>
+        </div>
       </div>
+
+      {/* Car List */}
+      <CarList 
+        vendorId={vendorId || undefined}
+        onViewDetails={handleViewDetails}
+        onBookNow={handleBookNow}
+      />
+
+      {/* Add Vehicle FAB */}
+      <AddVehicle />
     </div>
   )
 }

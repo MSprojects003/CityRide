@@ -9,11 +9,21 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',   // ← Added for Google profile pics
+        hostname: 'lh3.googleusercontent.com',
       },
       {
         protocol: 'https',
-        hostname: '**.googleusercontent.com',   // ← Safer way (covers all subdomains)
+        hostname: '**.googleusercontent.com',
+      },
+      // Add Supabase storage hostname
+      {
+        protocol: 'https',
+        hostname: 'kniyembgunqpuxnvzycm.supabase.co',
+      },
+      // Or use a wildcard pattern for all subdomains
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
       },
     ],
   },
